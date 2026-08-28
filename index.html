@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Simple Image Combiner</title>
+  <style>
+    :root{--ink:#17223b;--muted:#687187;--paper:#f4f6fa;--card:#fff;--line:#d9deea;--accent:#3157d5;--accent2:#2445b5;--ok:#287a50;--warn:#a76116}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+    .wrap{width:min(1080px,calc(100% - 32px));margin:0 auto;padding:42px 0 70px}
+    h1{font-size:clamp(28px,4vw,42px);line-height:1.12;margin:0 0 10px;letter-spacing:-.035em}
+    h2{font-size:18px;margin:0 0 5px}
+    p{margin:0;color:var(--muted)}
+    .privacy{display:inline-flex;align-items:center;gap:7px;margin-top:14px;color:var(--ok);font-weight:650;font-size:13px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;margin-top:20px;box-shadow:0 6px 22px rgba(33,46,85,.05)}
+    .dropzone{margin-top:18px;min-height:190px;border:2px dashed #b9c2d8;border-radius:14px;display:grid;place-items:center;text-align:center;padding:28px;cursor:pointer;background:#fafbfe;transition:.15s}
+    .dropzone:hover,.dropzone.drag{border-color:var(--accent);background:#f2f5ff;transform:translateY(-1px)}
+    .dropzone strong{display:block;font-size:17px;margin-bottom:4px}
+    .dropzone input{display:none}
+    .controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:20px}
+    label{display:block;font-size:12px;font-weight:750;color:var(--muted);text-transform:uppercase;letter-spacing:.045em}
+    input[type=number],select{width:100%;margin-top:6px;padding:11px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font:inherit}
+    input:focus,select:focus{outline:3px solid rgba(49,87,213,.13);border-color:var(--accent)}
+    .options{display:flex;gap:24px;flex-wrap:wrap;margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}
+    .check{display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink);cursor:pointer}
+    .check input{width:17px;height:17px;accent-color:var(--accent)}
+    .summary{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;flex-wrap:wrap}
+    #status{font-size:13px;color:var(--muted)}
+    #status.warn{color:var(--warn);font-weight:650}
+    #status.ok{color:var(--ok);font-weight:650}
+    .buttons{display:flex;gap:10px;flex-wrap:wrap}
+    button{border:0;border-radius:9px;padding:11px 16px;font:650 14px system-ui;cursor:pointer}
+    button.primary{background:var(--accent);color:#fff}
+    button.primary:hover{background:var(--accent2)}
+    button.secondary{background:#eef1f7;color:var(--ink)}
+    button:disabled{opacity:.42;cursor:not-allowed}
+    .files{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:18px}
+    .file{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+    .file img{display:block;width:100%;height:92px;object-fit:contain;background:#f7f8fb}
+    .file span{display:block;padding:7px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)}
+    .file button{position:absolute;right:5px;top:5px;width:25px;height:25px;padding:0;border-radius:50%;background:rgba(16,28,55,.83);color:#fff}
+    .preview-shell{margin-top:18px;max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:12px;background:#e9edf5;padding:10px}
+    canvas{display:block;max-width:100%;height:auto;margin:auto;background:#fff;box-shadow:0 2px 12px rgba(20,30,60,.12)}
+    .empty{text-align:center;padding:42px 20px;color:var(--muted)}
+    .note{font-size:12px;margin-top:10px}
+    @media(max-width:720px){.controls{grid-template-columns:repeat(2,minmax(0,1fr))}.card{padding:18px}.wrap{width:min(100% - 20px,1080px);padding-top:24px}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <h1>Simple Image Combiner</h1>
+      <p>Drop all your screenshots, choose the grid, and download one clean combined image. No watermark.</p>
+      <div class="privacy">✓ Images stay on your device and are processed only in this browser.</div>
+    </header>
+
+    <section class="card">
+      <h2>1. Add images</h2>
+      <p>You can select or drag many PNG, JPEG, or WebP files at once.</p>
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose or drop images">
+        <input id="fileInput" type="file" accept="image/*" multiple>
+        <div><strong>Drop all images here</strong><span>or click to select multiple files</span></div>
+      </div>
+      <div class="files" id="files"></div>
+    </section>
+
+    <section class="card">
+      <h2>2. Set the layout</h2>
+      <p>Example: enter 5 columns and 8 rows for a 5 × 8 grid.</p>
+      <div class="controls">
+        <label>Columns<input id="columns" type="number" min="1" max="20" value="5"></label>
+        <label>Rows<input id="rows" type="number" min="1" max="30" value="8"></label>
+        <label>Gap (pixels)<input id="gap" type="number" min="0" max="100" value="12"></label>
+        <label>Output format<select id="format"><option value="png">PNG — sharp text</option><option value="jpeg">JPEG — smaller file</option></select></label>
+      </div>
+      <div class="options">
+        <label class="check"><input id="sortHeight" type="checkbox" checked> Put images with more content rows at the bottom</label>
+        <label class="check"><input id="centerLast" type="checkbox" checked> Center the final incomplete row</label>
+        <label class="check"><input id="lightBackground" type="checkbox" checked> Light-grey outer background</label>
+      </div>
+      <div class="summary">
+        <span id="status">Add images to begin.</span>
+        <div class="buttons">
+          <button class="secondary" id="clearBtn" type="button" disabled>Clear all</button>
+          <button class="primary" id="downloadBtn" type="button" disabled>Download combined image</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3. Preview</h2>
+      <p>The preview updates automatically whenever images or layout settings change.</p>
+      <div class="preview-shell">
+        <div class="empty" id="empty">Your combined image will appear here.</div>
+        <canvas id="canvas" hidden></canvas>
+      </div>
+      <p class="note">Each screenshot keeps its original aspect ratio. Images are given a consistent width and are never cropped or stretched.</p>
+    </section>
+  </main>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const dropzone=$('dropzone'), input=$('fileInput'), filesEl=$('files'), canvas=$('canvas');
+    const ctx=canvas.getContext('2d'), status=$('status'), downloadBtn=$('downloadBtn'), clearBtn=$('clearBtn');
+    const settings=['columns','rows','gap','format','sortHeight','centerLast','lightBackground'];
+    let images=[];
+
+    function naturalKey(name){
+      const match=name.match(/\d+/);
+      return match ? Number(match[0]) : Number.MAX_SAFE_INTEGER;
+    }
+
+    function readImage(file){
+      return new Promise((resolve,reject)=>{
+        const url=URL.createObjectURL(file), img=new Image();
+        img.onload=()=>resolve({file,img,url,width:img.naturalWidth,height:img.naturalHeight,order:naturalKey(file.name)});
+        img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error(file.name));};
+        img.src=url;
+      });
+    }
+
+    async function addFiles(fileList){
+      const candidates=[...fileList].filter(f=>f.type.startsWith('image/'));
+      if(!candidates.length)return;
+      status.className='';status.textContent=`Loading ${candidates.length} image(s)…`;
+      const loaded=await Promise.allSettled(candidates.map(readImage));
+      images.push(...loaded.filter(x=>x.status==='fulfilled').map(x=>x.value));
+      renderFileList();render();
+    }
+
+    function renderFileList(){
+      filesEl.innerHTML='';
+      images.forEach((item,index)=>{
+        const card=document.createElement('div');card.className='file';
+        const img=document.createElement('img');img.src=item.url;img.alt='';
+        const name=document.createElement('span');name.textContent=item.file.name;
+        const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.title='Remove image';
+        remove.onclick=()=>{URL.revokeObjectURL(images[index].url);images.splice(index,1);renderFileList();render();};
+        card.append(img,name,remove);filesEl.append(card);
+      });
+    }
+
+    function orderedImages(){
+      const copy=[...images];
+      if($('sortHeight').checked) copy.sort((a,b)=>a.height-b.height || a.order-b.order || a.file.name.localeCompare(b.file.name,undefined,{numeric:true}));
+      else copy.sort((a,b)=>a.order-b.order || a.file.name.localeCompare(b.file.name,undefined,{numeric:true}));
+      return copy;
+    }
+
+    function render(){
+      const cols=Math.max(1,Number($('columns').value)||1), requestedRows=Math.max(1,Number($('rows').value)||1);
+      const gap=Math.max(0,Number($('gap').value)||0), capacity=cols*requestedRows;
+      clearBtn.disabled=!images.length;downloadBtn.disabled=true;
+      if(!images.length){canvas.hidden=true;$('empty').hidden=false;status.className='';status.textContent='Add images to begin.';return;}
+      if(images.length>capacity){canvas.hidden=true;$('empty').hidden=false;status.className='warn';status.textContent=`Grid capacity is ${capacity}, but ${images.length} images were added. Increase columns or rows.`;return;}
+
+      const ordered=orderedImages(), tileW=400, pad=16, actualRows=Math.ceil(ordered.length/cols);
+      const rowHeights=[];
+      for(let r=0;r<actualRows;r++){
+        const group=ordered.slice(r*cols,(r+1)*cols);
+        rowHeights.push(Math.max(...group.map(x=>Math.round(x.height*tileW/x.width))));
+      }
+      canvas.width=pad*2+cols*tileW+(cols-1)*gap;
+      canvas.height=pad*2+rowHeights.reduce((a,b)=>a+b,0)+(actualRows-1)*gap;
+      ctx.fillStyle=$('lightBackground').checked?'#f4f6fa':'#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+      let y=pad;
+      for(let r=0;r<actualRows;r++){
+        const group=ordered.slice(r*cols,(r+1)*cols), rowW=group.length*tileW+(group.length-1)*gap;
+        let x=(r===actualRows-1 && group.length<cols && $('centerLast').checked)?Math.round((canvas.width-rowW)/2):pad;
+        group.forEach(item=>{
+          const h=Math.round(item.height*tileW/item.width), dy=y+Math.round((rowHeights[r]-h)/2);
+          ctx.fillStyle='#fff';ctx.fillRect(x,dy,tileW,h);ctx.drawImage(item.img,x,dy,tileW,h);
+          ctx.strokeStyle='#d9deea';ctx.lineWidth=1;ctx.strokeRect(x+.5,dy+.5,tileW-1,h-1);x+=tileW+gap;
+        });
+        y+=rowHeights[r]+gap;
+      }
+      canvas.hidden=false;$('empty').hidden=true;downloadBtn.disabled=false;
+      status.className='ok';status.textContent=`Ready: ${ordered.length} images · ${cols} columns × ${actualRows} used rows (${requestedRows} allowed) · ${canvas.width} × ${canvas.height}px`;
+    }
+
+    dropzone.onclick=()=>input.click();
+    dropzone.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();input.click();}};
+    input.onchange=()=>{addFiles(input.files);input.value='';};
+    ['dragenter','dragover'].forEach(type=>dropzone.addEventListener(type,e=>{e.preventDefault();dropzone.classList.add('drag');}));
+    ['dragleave','drop'].forEach(type=>dropzone.addEventListener(type,e=>{e.preventDefault();dropzone.classList.remove('drag');}));
+    dropzone.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
+    settings.forEach(id=>$(id).addEventListener('input',render));
+    clearBtn.onclick=()=>{images.forEach(x=>URL.revokeObjectURL(x.url));images=[];renderFileList();render();};
+    downloadBtn.onclick=()=>{
+      const type=$('format').value==='jpeg'?'image/jpeg':'image/png', ext=type==='image/jpeg'?'jpg':'png';
+      canvas.toBlob(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`combined-${$('columns').value}x${$('rows').value}.${ext}`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);},type,.94);
+    };
+    render();
+  </script>
+</body>
+</html>
