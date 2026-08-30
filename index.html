@@ -95,7 +95,7 @@
         <div class="empty" id="empty">Your combined image will appear here.</div>
         <canvas id="canvas" hidden></canvas>
       </div>
-      <p class="note">Each screenshot keeps its original aspect ratio. Images are given a consistent width and are never cropped or stretched.</p>
+      <p class="note">Original-quality mode: every screenshot is drawn at its native pixel dimensions with no resizing, cropping, or stretching. The on-page preview may look smaller to fit your screen, but the downloaded file keeps the full resolution.</p>
     </section>
   </main>
 
@@ -155,11 +155,11 @@
       if(!images.length){canvas.hidden=true;$('empty').hidden=false;status.className='';status.textContent='Add images to begin.';return;}
       if(images.length>capacity){canvas.hidden=true;$('empty').hidden=false;status.className='warn';status.textContent=`Grid capacity is ${capacity}, but ${images.length} images were added. Increase columns or rows.`;return;}
 
-      const ordered=orderedImages(), tileW=400, pad=16, actualRows=Math.ceil(ordered.length/cols);
+      const ordered=orderedImages(), tileW=Math.max(...ordered.map(x=>x.width)), pad=16, actualRows=Math.ceil(ordered.length/cols);
       const rowHeights=[];
       for(let r=0;r<actualRows;r++){
         const group=ordered.slice(r*cols,(r+1)*cols);
-        rowHeights.push(Math.max(...group.map(x=>Math.round(x.height*tileW/x.width))));
+        rowHeights.push(Math.max(...group.map(x=>x.height)));
       }
       canvas.width=pad*2+cols*tileW+(cols-1)*gap;
       canvas.height=pad*2+rowHeights.reduce((a,b)=>a+b,0)+(actualRows-1)*gap;
@@ -170,14 +170,14 @@
         const group=ordered.slice(r*cols,(r+1)*cols), rowW=group.length*tileW+(group.length-1)*gap;
         let x=(r===actualRows-1 && group.length<cols && $('centerLast').checked)?Math.round((canvas.width-rowW)/2):pad;
         group.forEach(item=>{
-          const h=Math.round(item.height*tileW/item.width), dy=y+Math.round((rowHeights[r]-h)/2);
-          ctx.fillStyle='#fff';ctx.fillRect(x,dy,tileW,h);ctx.drawImage(item.img,x,dy,tileW,h);
-          ctx.strokeStyle='#d9deea';ctx.lineWidth=1;ctx.strokeRect(x+.5,dy+.5,tileW-1,h-1);x+=tileW+gap;
+          const dx=x+Math.round((tileW-item.width)/2), dy=y+Math.round((rowHeights[r]-item.height)/2);
+          ctx.fillStyle='#fff';ctx.fillRect(dx,dy,item.width,item.height);ctx.drawImage(item.img,dx,dy);
+          ctx.strokeStyle='#d9deea';ctx.lineWidth=1;ctx.strokeRect(dx+.5,dy+.5,item.width-1,item.height-1);x+=tileW+gap;
         });
         y+=rowHeights[r]+gap;
       }
       canvas.hidden=false;$('empty').hidden=true;downloadBtn.disabled=false;
-      status.className='ok';status.textContent=`Ready: ${ordered.length} images · ${cols} columns × ${actualRows} used rows (${requestedRows} allowed) · ${canvas.width} × ${canvas.height}px`;
+      status.className='ok';status.textContent=`Original quality: ${ordered.length} images · ${cols} columns × ${actualRows} used rows (${requestedRows} allowed) · ${canvas.width} × ${canvas.height}px`;
     }
 
     dropzone.onclick=()=>input.click();
